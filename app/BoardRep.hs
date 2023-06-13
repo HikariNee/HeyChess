@@ -1,39 +1,39 @@
 module BoardRep where
 
+import Data.Maybe (fromJust, isJust)
 import qualified Data.Vector as V
-import Data.List (intersperse, intercalate)
+import Data.List (lookup,intersperse, intercalate)
 import Data.Char as C
-import GHC.IO.Handle (HandlePosn(HandlePosn))
+import Data.Bool (bool)
+import Data.Tuple (swap)
 
 data PieceType = Rook | Queen | Knight | Bishop | King | Pawn deriving (Eq)
 data Colour = White  | Black deriving (Show, Eq)
 data Piece = Piece !Colour !PieceType
 
+assoc :: [(PieceType, Char)]
+assoc = [ (King,   'k')
+        , (Queen,  'q')
+        , (Knight, 'n')
+        , (Bishop, 'b')
+        , (Pawn,   'p')
+        , (Rook,   'r')
+        ]
+
 instance Show PieceType where
-  show King = "k"
-  show Queen = "q"
-  show Knight = "n"
-  show Bishop = "b"
-  show Pawn = "p"
-  show Rook = "r"
+  show key = [fromJust (lookup key assoc)] 
 
-instance Show Piece where
-  show (Piece White t) = map C.toUpper $ show t 
-  show (Piece Black t) = show t 
+instance Show Piece where 
+  show (Piece color t) = case color of 
+    White -> map C.toUpper (show t)
+    Black -> show t
+    
+readPiece :: Char -> Maybe Piece 
+readPiece char = fmap (Piece colour) piece
+  where
+  colour = bool Black White (C.isUpper char)
+  piece = lookup char (map swap assoc)
 
-instance Read Piece where
-  readsPrec _ [a] = if C.toLower a `elem` "kqnbpr" 
-                       then let colour = if isUpper a then White else Black
-                                piece = case toLower a of
-                                          'p' -> Pawn
-                                          'r' -> Rook
-                                          'b' -> Bishop
-                                          'n' -> Knight
-                                          'k' -> King
-                                          'q' -> Queen
-                                            
-                            in [(Piece colour piece, " ")]
-                          else []
 
 data Board = Board { vec :: V.Vector (Maybe Piece), nextMove :: !Colour  }
 
@@ -49,5 +49,26 @@ initBoard = Board { vec = V.fromList $ concat $ [whiteRear, whiteFront] ++ repli
   blackRear = map (Just . Piece Black) rear
   blackFront = replicate 8 $ Just $ Piece Black Pawn
   emptyRows = replicate 8 Nothing
+
+type Position = (Int, Int)
+
+toIndex :: Position -> Int
+toIndex (f,r) = 8 * r + f
+
+fromIndex ::Int -> Position 
+fromIndex n = (n `mod` 8, n `quot` 8)
+
+fetchPiece :: Board -> Position -> Maybe Piece
+fetchPiece n p 
+  | r < 0 || r > 63 = Nothing
+  | otherwise = vec n V.! r
+  where r = toIndex p 
+
+removePiece :: Board -> Position -> Board
+removePiece cb p 
+  | i < 0 || i > 63 = cb 
+  | otherwise = Board ( vec cb V.// [(i, Nothing)] ) $ nextMove cb
+ where
+   i = toIndex p
 
 
